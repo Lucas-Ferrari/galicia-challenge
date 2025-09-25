@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     @property
     def db_url(self) -> str:
-        if self.dababase_url:
+        if self.database_url:
             return self.database_url
         return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
