@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from app.config import settings
 
+from app.routes.airports import router as airports_router
+
 
 app = FastAPI(
     title=settings.api_title,
@@ -10,6 +12,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+app.include_router(airports_router)
 
 @app.get("/")
 async def root():

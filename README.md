@@ -160,7 +160,7 @@ curl http://localhost:8000/docs
 
 ### Endpoints de Datos (Próximamente)
 
-- `POST /airports/upload` - Cargar aeropuertos desde archivo
+- `POST /airports/import` - Cargar aeropuertos desde archivo
 - `GET /analytics/domestic-flights` - Estadísticas de vuelos domésticos
 - `GET /analytics/consecutive-routes` - Rutas consecutivas de alta ocupación
 - `GET /analytics/top-routes/{country}` - Top 5 rutas por país
@@ -219,7 +219,7 @@ docker-compose restart db
 # Verificar que los archivos existen
 ls -la data/
 
-# Ver logs detallados
+# Cargar dump inicial de BD
 python load_initial_data.py
 ```
 
