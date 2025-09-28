@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from app.config import settings
 
 from app.routes.airports import router as airports_router
+from app.routes.analytics import router as analytics_router
 
 
 app = FastAPI(
@@ -13,6 +14,7 @@ app = FastAPI(
 )
 
 app.include_router(airports_router)
+app.include_router(analytics_router)
 
 @app.get("/")
 async def root():
