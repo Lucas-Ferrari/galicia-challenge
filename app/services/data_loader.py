@@ -140,15 +140,46 @@ class DataLoader:
         return created_count, updated_count, errors
 
     def load_routes_from_csv(self, file_path: str) -> Tuple[int, List[str]]:
-        """Load routes from CSV file"""
+        """Load routes from CSV file with individual record processing"""
         created_count = 0
         errors = []
 
         try:
-            df = pd.read_csv(file_path, sep="|")
+            # Leer CSV con manejo de valores nulos
+            df = pd.read_csv(file_path, sep="|", na_values=['\\N', 'NULL', ''])
+
+            print(f"Total rows in CSV: {len(df)}")
+            print(f"Columns: {df.columns.tolist()}")
+
+            # Cache de aeropuertos existentes para validación rápida
+            existing_airports = set()
+            try:
+                airport_query = self.db.execute("SELECT id FROM airports")
+                existing_airports = {row[0] for row in airport_query.fetchall()}
+                print(f"Found {len(existing_airports)} airports in database")
+            except Exception as e:
+                print(f"Warning: Could not load airports for validation: {e}")
 
             for index, row in df.iterrows():
                 try:
+                    # Validar que no haya valores nulos en campos críticos
+                    if pd.isna(row["AeropuertoDestinoID"]) or pd.isna(row["AeropuertoOrigenID"]):
+                        errors.append(f"Row {index + 2}: Missing airport ID (Origin: {row['AeropuertoOrigenID']}, Destination: {row['AeropuertoDestinoID']})")
+                        continue
+
+                    origin_id = int(row["AeropuertoOrigenID"])
+                    destination_id = int(row["AeropuertoDestinoID"])
+
+                    # Validar que los aeropuertos existan (solo si tenemos el cache)
+                    if existing_airports:
+                        if origin_id not in existing_airports:
+                            errors.append(f"Row {index + 2}: Origin airport ID {origin_id} not found in database")
+                            continue
+                        if destination_id not in existing_airports:
+                            errors.append(f"Row {index + 2}: Destination airport ID {destination_id} not found in database")
+                            continue
+
+                    # Convertir fecha
                     flight_date = datetime.strptime(
                         str(row["Fecha"]), "%Y-%m-%d"
                     ).date()
@@ -157,31 +188,85 @@ class DataLoader:
                         "airline_code": str(row["CodAerolinea"]).strip(),
                         "airline_id": int(row["IDAerolinea"]),
                         "origin_code": str(row["AeropuertoOrigen"]).strip(),
-                        "origin_id": int(row["AeropuertoOrigenID"]),
+                        "origin_id": origin_id,
                         "destination_code": str(row["AeropuertoDestino"]).strip(),
-                        "destination_id": int(row["AeropuertoDestinoID"]),
+                        "destination_id": destination_id,
                         "tickets_sold": int(row["TicketsVendidos"]),
                         "total_seats": int(row["Lugares"]),
                         "flight_date": flight_date,
                     }
 
-                    # Basic validation
+                    # Validaciones básicas
                     if route_data["tickets_sold"] > route_data["total_seats"]:
-                        errors.append(f"Row {index + 2}: Tickets sold exceeds seats")
+                        errors.append(f"Row {index + 2}: Tickets sold ({route_data['tickets_sold']}) exceeds seats ({route_data['total_seats']})")
                         continue
 
-                    route = Route(**route_data)
-                    self.db.add(route)
-                    created_count += 1
+                    if route_data["total_seats"] <= 0:
+                        errors.append(f"Row {index + 2}: Invalid total seats ({route_data['total_seats']})")
+                        continue
 
+                    # Crear y agregar ruta con commit individual
+                    try:
+                        route = Route(**route_data)
+                        self.db.add(route)
+                        self.db.commit()
+                        created_count += 1
+
+                        # Log cada 100 registros procesados
+                        if created_count % 100 == 0:
+                            print(f"Successfully processed {created_count} routes...")
+
+                    except Exception as commit_error:
+                        # Rollback solo este registro y continuar
+                        self.db.rollback()
+                        error_detail = str(commit_error)
+                        if "foreign key constraint" in error_detail:
+                            errors.append(f"Row {index + 2}: Foreign key violation - Airport ID not found (Origin: {origin_id}, Destination: {destination_id})")
+                        else:
+                            errors.append(f"Row {index + 2}: Database error - {error_detail}")
+                        continue
+
+                except ValueError as ve:
+                    errors.append(f"Row {index + 2}: Value conversion error - {str(ve)}")
+                    continue
                 except Exception as e:
-                    errors.append(f"Row {index + 2}: {str(e)}")
+                    errors.append(f"Row {index + 2}: Unexpected error - {str(e)}")
                     continue
 
-            self.db.commit()
+            print(f"Load completed: {created_count} routes successfully loaded")
+
+            # Mostrar resumen de errores
+            if errors:
+                print(f"Found {len(errors)} errors:")
+
+                # Agrupar errores por tipo para mejor análisis
+                error_types = {}
+                for error in errors:
+                    if "Foreign key violation" in error:
+                        error_types["Foreign Key Violations"] = error_types.get("Foreign Key Violations", 0) + 1
+                    elif "Missing airport ID" in error:
+                        error_types["Missing Airport IDs"] = error_types.get("Missing Airport IDs", 0) + 1
+                    elif "Tickets sold exceeds seats" in error:
+                        error_types["Data Validation"] = error_types.get("Data Validation", 0) + 1
+                    else:
+                        error_types["Other"] = error_types.get("Other", 0) + 1
+
+                print("Error summary:")
+                for error_type, count in error_types.items():
+                    print(f"  - {error_type}: {count}")
+
+                # Mostrar los primeros 10 errores específicos
+                print("\nFirst 10 specific errors:")
+                for error in errors[:10]:
+                    print(f"  - {error}")
+                if len(errors) > 10:
+                    print(f"  ... and {len(errors) - 10} more errors")
+            else:
+                print("No errors found!")
 
         except Exception as e:
-            self.db.rollback()
-            errors.append(f"File error: {str(e)}")
+            error_msg = f"File processing error: {str(e)}"
+            errors.append(error_msg)
+            print(error_msg)
 
         return created_count, errors
