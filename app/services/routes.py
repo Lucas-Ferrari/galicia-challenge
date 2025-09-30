@@ -1,11 +1,20 @@
 from typing import List, Dict
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
-from datetime import date, datetime
+from sqlalchemy import func, and_, case
+from datetime import date
+
+from app.models.airline import Airline
 from app.models.route import Route
 from app.models.airport import Airport
-from app.schemas.route import MostFlownRoute, MostFlownByCountryResponse
 
+from app.schemas.route import (
+    MostFlownRoute,
+    MostFlownByCountryResponse,
+    DomesticFlightDetail,
+    DomesticHighOccupancyAltitudeDeltaWithDetails,
+)
+
+from app.config import settings
 
 class RouteService:
     """Service for route operations"""
@@ -112,3 +121,154 @@ class RouteService:
                 name_map[airport.icao_code] = airport.name
 
         return name_map
+
+    def get_domestic_high_occupancy_altitude_delta(
+        self,
+        date_from: date = None,
+        date_to: date = None,
+        page: int = 1,
+        page_size: int = 25
+    ) -> DomesticHighOccupancyAltitudeDeltaWithDetails:
+        """
+        Calculate percentage of domestic flights with:
+        - Occupancy rate >= 85% (from settings)
+        - Altitude difference between origin and destination > 1000m (from settings)
+
+        A domestic flight is one where origin and destination are in the same country.
+        Returns paginated list of flights meeting criteria.
+
+        Args:
+            date_from: Optional start date for filtering (defaults to today)
+            date_to: Optional end date for filtering (defaults to today)
+            page: Page number (1-indexed)
+            page_size: Number of flights per page (default 25)
+
+        Returns:
+            Report with statistics and paginated flight details
+        """
+        today = date.today()
+        if date_from is None:
+            date_from = today
+        if date_to is None:
+            date_to = today
+
+        occupancy_threshold = settings.high_occupancy_threshold
+        altitude_threshold = settings.min_altitude
+
+        origin = Airport.__table__.alias('origin')
+        destination = Airport.__table__.alias('destination')
+
+        query = (
+            self.db.query(
+                func.count(Route.id).label('total_domestic'),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                (Route.tickets_sold / Route.total_seats) >= occupancy_threshold,
+                                func.abs(origin.c.altitude - destination.c.altitude) > altitude_threshold
+                            ),
+                            1
+                        ),
+                        else_=0
+                    )
+                ).label('meeting_criteria')
+            )
+            .join(origin, Route.origin_id == origin.c.id)
+            .join(destination, Route.destination_id == destination.c.id)
+            .filter(
+                and_(
+                    Route.flight_date >= date_from,
+                    Route.flight_date <= date_to,
+                    origin.c.country == destination.c.country,  # Domestic flights only
+                    Route.total_seats > 0  # Avoid division by zero
+                )
+            )
+        )
+
+        result = query.first()
+
+        total_domestic = result.total_domestic or 0
+        meeting_criteria = result.meeting_criteria or 0
+
+        if total_domestic > 0:
+            percentage = (meeting_criteria / total_domestic) * 100
+        else:
+            percentage = 0.0
+
+        flights_query = (
+            self.db.query(
+                Route.id.label('route_id'),
+                Route.airline_code,
+                Airline.name.label('airline_name'),
+                Route.origin_code,
+                origin.c.name.label('origin_name'),
+                origin.c.altitude.label('origin_altitude'),
+                Route.destination_code,
+                destination.c.name.label('destination_name'),
+                destination.c.altitude.label('destination_altitude'),
+                func.abs(origin.c.altitude - destination.c.altitude).label('altitude_delta'),
+                origin.c.country,
+                Route.flight_date,
+                Route.tickets_sold,
+                Route.total_seats,
+                (Route.tickets_sold / Route.total_seats).label('occupancy_rate')
+            )
+            .join(origin, Route.origin_id == origin.c.id)
+            .join(destination, Route.destination_id == destination.c.id)
+            .join(Airline, Route.airline_id == Airline.id)
+            .filter(
+                and_(
+                    Route.flight_date >= date_from,
+                    Route.flight_date <= date_to,
+                    origin.c.country == destination.c.country,
+                    Route.total_seats > 0,
+                    (Route.tickets_sold / Route.total_seats) >= occupancy_threshold,
+                    func.abs(origin.c.altitude - destination.c.altitude) > altitude_threshold
+                )
+            )
+            .order_by(Route.flight_date.desc(), Route.id)
+        )
+
+        offset = (page - 1) * page_size
+        paginated_flights = flights_query.limit(page_size).offset(offset).all()
+
+        flight_details = []
+        for flight in paginated_flights:
+            occupancy_rate = flight.occupancy_rate
+            flight_detail = DomesticFlightDetail(
+                route_id=flight.route_id,
+                airline_code=flight.airline_code,
+                airline_name=flight.airline_name,
+                origin_code=flight.origin_code,
+                origin_name=flight.origin_name,
+                origin_altitude=flight.origin_altitude,
+                destination_code=flight.destination_code,
+                destination_name=flight.destination_name,
+                destination_altitude=flight.destination_altitude,
+                altitude_delta=flight.altitude_delta,
+                country=flight.country,
+                flight_date=flight.flight_date,
+                occupancy_rate=round(occupancy_rate, 4),
+                occupancy_percentage=round(occupancy_rate * 100, 2),
+                tickets_sold=flight.tickets_sold,
+                total_seats=flight.total_seats
+            )
+            flight_details.append(flight_detail)
+
+        import math
+        total_pages = math.ceil(meeting_criteria / page_size) if meeting_criteria > 0 else 0
+
+        return DomesticHighOccupancyAltitudeDeltaWithDetails(
+            date_from=date_from,
+            date_to=date_to,
+            total_domestic_flights=total_domestic,
+            flights_meeting_criteria=meeting_criteria,
+            percentage=round(percentage, 2),
+            high_occupancy_threshold=occupancy_threshold,
+            altitude_delta_threshold=altitude_threshold,
+            flights=flight_details,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )
