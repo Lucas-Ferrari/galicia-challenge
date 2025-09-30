@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date
-from typing import Optional
+from typing import List
 
 
 class Route(BaseModel):
@@ -19,35 +19,36 @@ class Route(BaseModel):
         from_attributes = True
 
 
-class ConsecutiveHighOccupancyRoute(BaseModel):
-    """Consecutive high occupancy routes"""
+class MostFlownRoute(BaseModel):
+    """Schema for most flown route"""
 
-    airline_id: int
-    airline_name: str
-    route_key: str
     origin_code: str
     destination_code: str
-    consecutive_days: int
-    start_date: date
-    end_date: date
+    origin_name: str
+    destination_name: str
+    flight_count: int = Field(..., description="Number of flights on this route")
+
+    class Config:
+        from_attributes = True
 
 
-class DomesticFlightStats(BaseModel):
-    """Domestic flight statistics"""
+class MostFlownByCountryResponse(BaseModel):
+    """Response for most flown routes by country"""
 
-    total_high_occupancy_flights: int
-    domestic_high_occupancy_flights: int
-    domestic_high_altitude_flights: int
-    percentage_domestic: float
-    percentage_domestic_high_altitude: float
-    meets_criteria: bool
+    country: str
+    routes: List[MostFlownRoute]
+
+    class Config:
+        from_attributes = True
 
 
-class TopRoute(BaseModel):
-    """Top routes by country"""
+class MostFlownByCountryList(BaseModel):
+    """List response wrapper"""
 
-    rank: int
-    route_key: str
-    origin_code: str
-    destination_code: str
-    flight_count: int
+    date_from: date
+    date_to: date
+    countries: List[MostFlownByCountryResponse]
+    page: int
+    page_size: int
+    total_countries: int
+    total_pages: int
