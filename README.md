@@ -2,6 +2,9 @@
 
 API REST para gestión de aeropuertos, aerolíneas y rutas de vuelo construida con FastAPI, SQLAlchemy y PostgreSQL.
 
+## Instancia en ejecucion:
+https://upbeat-unused-lizette.ngrok-free.dev/docs#/
+
 ## Requerimientos del Sistema
 
 - **Python**: 3.11 o superior (recomendado 3.12)
