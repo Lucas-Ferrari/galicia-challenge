@@ -46,3 +46,49 @@ class AirlineOccupancyResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class ConsecutiveRouteDetail(BaseModel):
+    """Detail of a route flown on consecutive days with high occupancy"""
+
+    origin_code: str
+    destination_code: str
+    origin_name: str
+    destination_name: str
+    consecutive_days: int = Field(..., description="Number of consecutive days")
+    start_date: date = Field(..., description="First date of consecutive sequence")
+    end_date: date = Field(..., description="Last date of consecutive sequence")
+    avg_occupancy_rate: float
+    avg_occupancy_percentage: float
+
+    class Config:
+        from_attributes = True
+
+
+class AirlineConsecutiveRoutes(BaseModel):
+    """Airline with its consecutive high occupancy routes"""
+
+    airline_id: int
+    airline_name: str
+    airline_code: str
+    country: Optional[str] = None
+    total_consecutive_routes: int = Field(
+        ..., description="Number of routes with consecutive high occupancy"
+    )
+    routes: List[ConsecutiveRouteDetail]
+
+    class Config:
+        from_attributes = True
+
+
+class ConsecutiveHighOccupancyResponse(BaseModel):
+    """Response for consecutive high occupancy routes"""
+
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+    high_occupancy_threshold: float
+    airlines: List[AirlineConsecutiveRoutes]
+    page: int
+    page_size: int
+    total_airlines: int
+    total_pages: int
