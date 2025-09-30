@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  db:
+  gal_db:
     image: postgres:15
     container_name: galicia_db
     env_file:
@@ -26,12 +26,12 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      db:
+      gal_db:
         condition: service_healthy
     env_file:
       - .env
     environment:
-      POSTGRES_HOST: db
+      POSTGRES_HOST: gal_db
     volumes:
       - ./app:/app/app
       - ./data:/app/data

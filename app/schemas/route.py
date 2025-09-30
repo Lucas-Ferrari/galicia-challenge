@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 
 
 class Route(BaseModel):
@@ -19,35 +19,101 @@ class Route(BaseModel):
         from_attributes = True
 
 
-class ConsecutiveHighOccupancyRoute(BaseModel):
-    """Consecutive high occupancy routes"""
+class MostFlownRoute(BaseModel):
+    """Schema for most flown route"""
 
-    airline_id: int
-    airline_name: str
-    route_key: str
     origin_code: str
     destination_code: str
-    consecutive_days: int
-    start_date: date
-    end_date: date
+    origin_name: str
+    destination_name: str
+    flight_count: int = Field(..., description="Number of flights on this route")
+
+    class Config:
+        from_attributes = True
 
 
-class DomesticFlightStats(BaseModel):
-    """Domestic flight statistics"""
+class MostFlownByCountryResponse(BaseModel):
+    """Response for most flown routes by country"""
 
-    total_high_occupancy_flights: int
-    domestic_high_occupancy_flights: int
-    domestic_high_altitude_flights: int
-    percentage_domestic: float
-    percentage_domestic_high_altitude: float
-    meets_criteria: bool
+    country: str
+    routes: List[MostFlownRoute]
+
+    class Config:
+        from_attributes = True
 
 
-class TopRoute(BaseModel):
-    """Top routes by country"""
+class MostFlownByCountryList(BaseModel):
+    """List response wrapper"""
 
-    rank: int
-    route_key: str
+    date_from: date
+    date_to: date
+    countries: List[MostFlownByCountryResponse]
+    page: int
+    page_size: int
+    total_countries: int
+    total_pages: int
+
+
+class DomesticHighOccupancyAltitudeDelta(BaseModel):
+    """Response for domestic high occupancy altitude delta report"""
+
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+    total_domestic_flights: int = Field(
+        ..., description="Total number of domestic flights"
+    )
+    flights_meeting_criteria: int = Field(
+        ..., description="Flights with occupancy >= 85% and altitude delta > 1000m"
+    )
+    percentage: float = Field(..., description="Percentage of flights meeting criteria")
+    high_occupancy_threshold: float = Field(
+        default=0.85, description="Occupancy threshold used (default 0.85)"
+    )
+    altitude_delta_threshold: int = Field(
+        default=1000,
+        description="Altitude difference threshold in meters (default 1000)",
+    )
+
+
+class DomesticFlightDetail(BaseModel):
+    """Detail of a specific domestic flight meeting criteria"""
+
+    route_id: int
+    airline_code: str
+    airline_name: Optional[str] = None
     origin_code: str
+    origin_name: str
+    origin_altitude: Optional[int] = None
     destination_code: str
-    flight_count: int
+    destination_name: str
+    destination_altitude: Optional[int] = None
+    altitude_delta: int = Field(
+        ..., description="Absolute altitude difference in meters"
+    )
+    country: str
+    flight_date: date
+    occupancy_rate: float
+    occupancy_percentage: float
+    tickets_sold: int
+    total_seats: int
+
+    class Config:
+        from_attributes = True
+
+
+class DomesticHighOccupancyAltitudeDeltaWithDetails(BaseModel):
+    """Response with pagination and flight details"""
+
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+    total_domestic_flights: int
+    flights_meeting_criteria: int
+    percentage: float
+    high_occupancy_threshold: float
+    altitude_delta_threshold: int
+    flights: List[DomesticFlightDetail] = Field(
+        default=[], description="List of flights meeting criteria"
+    )
+    page: int
+    page_size: int
+    total_pages: int

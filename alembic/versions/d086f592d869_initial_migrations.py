@@ -1,8 +1,8 @@
-"""Initial migration
+"""Initial migrations
 
-Revision ID: 233e5e311209
+Revision ID: d086f592d869
 Revises: 
-Create Date: 2025-09-25 17:03:26.796227
+Create Date: 2025-09-29 20:15:06.083447
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '233e5e311209'
+revision: str = 'd086f592d869'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -37,15 +37,20 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('city', sa.String(length=100), nullable=False),
     sa.Column('country', sa.String(length=100), nullable=False),
-    sa.Column('code', sa.String(length=10), nullable=True),
+    sa.Column('iata_code', sa.String(length=10), nullable=True),
+    sa.Column('icao_code', sa.String(length=10), nullable=True),
     sa.Column('latitude', sa.Float(), nullable=True),
     sa.Column('longitude', sa.Float(), nullable=True),
     sa.Column('altitude', sa.Integer(), nullable=True),
+    sa.Column('utc_offset', sa.Float(), nullable=True),
+    sa.Column('continent_code', sa.String(length=10), nullable=True),
+    sa.Column('timezone', sa.String(length=100), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_airports_altitude'), 'airports', ['altitude'], unique=False)
-    op.create_index(op.f('ix_airports_code'), 'airports', ['code'], unique=True)
     op.create_index(op.f('ix_airports_country'), 'airports', ['country'], unique=False)
+    op.create_index(op.f('ix_airports_iata_code'), 'airports', ['iata_code'], unique=False)
+    op.create_index(op.f('ix_airports_icao_code'), 'airports', ['icao_code'], unique=True)
     op.create_index(op.f('ix_airports_id'), 'airports', ['id'], unique=False)
     op.create_table('routes',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -87,8 +92,9 @@ def downgrade() -> None:
     op.drop_index('idx_route_airline_date', table_name='routes')
     op.drop_table('routes')
     op.drop_index(op.f('ix_airports_id'), table_name='airports')
+    op.drop_index(op.f('ix_airports_icao_code'), table_name='airports')
+    op.drop_index(op.f('ix_airports_iata_code'), table_name='airports')
     op.drop_index(op.f('ix_airports_country'), table_name='airports')
-    op.drop_index(op.f('ix_airports_code'), table_name='airports')
     op.drop_index(op.f('ix_airports_altitude'), table_name='airports')
     op.drop_table('airports')
     op.drop_index(op.f('ix_airlines_id'), table_name='airlines')
