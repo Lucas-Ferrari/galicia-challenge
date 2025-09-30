@@ -7,21 +7,6 @@ from app.schemas.airport import AirportImportResponse
 
 router = APIRouter(prefix="/airports", tags=["airports"])
 
-@router.post("/test",
-             description="Testy endpoint")
-async def test_airports(db: Session = Depends(get_db)):
-    """
-    Returns a test response
-    """
-    from app.models.airline import Airline
-    from app.models.airport import Airport
-    from app.models.route import Route
-
-    airline_count = db.query(Airline).count()
-    airport_count = db.query(Airport).count()
-    route_count = db.query(Route).count()
-    return {"message": f"found {airline_count} airlines, {airport_count} airports, {route_count} routes"}
-
 @router.post("/import",
              description="Import airports from a .dat file",
              response_model=AirportImportResponse)

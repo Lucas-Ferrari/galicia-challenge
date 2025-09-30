@@ -4,10 +4,8 @@ from app.config import settings
 from app.middleware.audit import AuditMiddleware
 
 from app.routes.airports import router as airports_router
-from app.routes.analytics import router as analytics_router
 from app.routes.routes import router as routes_router
 from app.routes.airlines import router as airlines_router
-
 
 
 app = FastAPI(
@@ -18,14 +16,9 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-#Middlewares
+# Middlewares
 app.add_middleware(AuditMiddleware)
 
-#Routers
-app.include_router(airports_router)
-app.include_router(analytics_router)
-app.include_router(routes_router)
-app.include_router(airlines_router)
 
 @app.get("/")
 async def root():
@@ -41,3 +34,8 @@ async def root():
 async def health_check():
     """Health check endpoint for monitoring"""
     return {"status": "Alive"}
+
+# Routers
+app.include_router(airports_router)
+app.include_router(routes_router)
+app.include_router(airlines_router)

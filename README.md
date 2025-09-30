@@ -85,8 +85,7 @@ docker-compose up db -d
 # 2. Esperar a que PostgreSQL esté listo
 docker-compose logs db
 
-# 3. Crear y ejecutar migraciones
-docker-compose exec api alembic revision --autogenerate -m "Initial migration"
+# 3. Ejecutar migraciones
 docker-compose exec api alembic upgrade head
 
 # 4. Cargar datos iniciales
@@ -147,7 +146,7 @@ Una vez ejecutándose, verifica que todo funciona:
 # Health check
 curl http://localhost:8000/health
 
-# Documentación interactiva
+# Documentación
 curl http://localhost:8000/docs
 ```
 
@@ -156,15 +155,11 @@ curl http://localhost:8000/docs
 - `GET /` - Información básica de la API
 - `GET /health` - Health check
 - `GET /docs` - Documentación interactiva (Swagger)
-- `GET /redoc` - Documentación alternativa
-
-### Endpoints de Datos (Próximamente)
-
 - `POST /airports/import` - Cargar aeropuertos desde archivo
-- `GET /analytics/domestic-flights` - Estadísticas de vuelos domésticos
-- `GET /analytics/consecutive-routes` - Rutas consecutivas de alta ocupación
-- `GET /analytics/top-routes/{country}` - Top 5 rutas por país
-- `GET /analytics/airline-occupancy` - Promedio de ocupación por aerolínea
+- `GET /routes/most_flown_by_country` - Top 5 rutas por país
+- `GET /routes/domestic_high_occupancy_altitude_delta` - Aerolineas consecutivas de alta ocupación
+- `GET /airlines/occupancy_average` - Promedio de ocupación por aerolínea
+- `GET /airlines/consecutive_high_occupancy_routes` - Aerolineas que volaron dias consecutivos en rutas con alta ocupacion.
 
 ## Comandos Útiles
 
@@ -193,7 +188,7 @@ docker-compose up --build
 - **airports**: Información de aeropuertos
 - **airlines**: Información de aerolíneas
 - **routes**: Rutas de vuelo con ocupación
-- **request_audit**: Auditoría de requests
+- **audits**: Auditoría de requests
 
 ### Relaciones
 
