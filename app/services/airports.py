@@ -301,3 +301,18 @@ class AirportService:
                 return True, f"Duplicate IATA code '{iata_code}'"
 
         return False, ""
+
+    def get_airport_names_dict(self) -> dict:
+        """Get mapping of airport codes to names."""
+        airports = self.db.query(
+            Airport.iata_code, Airport.icao_code, Airport.name
+        ).all()
+
+        name_map = {}
+        for airport in airports:
+            if airport.iata_code:
+                name_map[airport.iata_code] = airport.name
+            if airport.icao_code:
+                name_map[airport.icao_code] = airport.name
+
+        return name_map
